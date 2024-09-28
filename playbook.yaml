@@ -440,3 +440,73 @@
 
 
 
+- name: Install Jenkins and JDK on Debian-based system
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Update apt package index
+      apt:
+        update_cache: yes
+
+    - name: Install OpenJDK 17 and fontconfig
+      apt:
+        name:
+          - fontconfig
+          - openjdk-17-jre
+        state: present
+
+    - name: Verify Java version
+      command: java -version
+      register: java_version_output
+      ignore_errors: yes
+
+    - name: Show Java version
+      debug:
+        msg: "Java version installed: {{ java_version_output.stderr_lines[0] }}"
+      when: java_version_output is defined
+
+    - name: Download Jenkins keyring
+      get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+
+    - name: Add Jenkins repository
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+        filename: 'jenkins'
+
+    - name: Update apt package index after adding Jenkins repo
+      apt:
+        update_cache: yes
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    - name: Enable Jenkins service
+      systemd:
+        name: jenkins
+        enabled: yes
+
+    - name: Start Jenkins service
+      systemd:
+        name: jenkins
+        state: started
+
+    - name: Get Jenkins version
+      command: jenkins --version
+      register: jenkins_version_output
+      ignore_errors: yes
+
+    - name: Show Jenkins version
+      debug:
+        msg: "Jenkins version installed: {{ jenkins_version_output.stdout }}"
+      when: jenkins_version_output is defined
+
+    - name: Check Jenkins service status
+      systemd:
+        name: jenkins
+        state: started
+        enabled: yes
