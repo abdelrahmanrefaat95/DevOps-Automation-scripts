@@ -238,10 +238,64 @@
         state: started
         enabled: yes
 
-    # Step 9: Display success message for Prometheus installation
     - name: Display Prometheus installation success message
       debug:
         msg: "Prometheus has been successfully installed and started."
+
+    - name: Download Node Exporter v1.8.2
+      ansible.builtin.get_url:
+        url: https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
+        dest: /tmp/node_exporter-1.8.2.linux-amd64.tar.gz
+
+    - name: Extract Node Exporter archive
+      ansible.builtin.unarchive:
+        src: /tmp/node_exporter-1.8.2.linux-amd64.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Move Node Exporter binary to /usr/local/bin
+      ansible.builtin.copy:
+        src: /tmp/node_exporter-1.8.2.linux-amd64/node_exporter
+        dest: /usr/local/bin/node_exporter
+        mode: '0755'
+
+    - name: Verify Node Exporter version
+      ansible.builtin.command: /usr/local/bin/node_exporter --version
+
+    - name: Create Node Exporter systemd service file
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=prometheus
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=default.target
+
+    - name: Reload systemd for Node Exporter
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable Node Exporter service
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: yes
+
+    - name: Start Node Exporter service
+      ansible.builtin.systemd:
+        name: node_exporter
+        state: started
+
+    - name: Restart Prometheus service
+      ansible.builtin.systemd:
+        name: prometheus
+        state: restarted
 
 # Play 2: Install Grafana
 - name: Install and configure Grafana
@@ -289,7 +343,7 @@
         state: stopped
 
     - name: Reset Grafana admin password
-      command: grafana-cli admin reset-admin-password your_new_password
+      command: grafana-cli admin reset-admin-password 123456789
 
     - name: Start Grafana server
       systemd:
@@ -383,5 +437,6 @@
     - name: Display Docker installation success message
       debug:
         msg: "Docker has been successfully installed and started. Please log out and log back in to apply the Docker group membership."
+
 
 
